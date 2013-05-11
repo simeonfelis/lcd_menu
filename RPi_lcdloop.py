@@ -1,5 +1,20 @@
 #!/usr/bin/python
 
+import sys, os
+
+
+# import Adafruit path
+
+CUR_DIR = os.path.dirname(__file__)
+
+# I have adafruit stuff one folder relative up
+
+ADAFRUIT_DIR = os.path.join(CUR_DIR, "..", "Adafruit-Raspberry-Pi-Python-Code")
+ADAFRUIT_LCD_PLATE = os.path.join(ADAFRUIT_DIR, "Adafruit_CharLCDPlate")
+
+sys.path.append(ADAFRUIT_DIR)
+sys.path.append(ADAFRUIT_LCD_PLATE)
+
 
 import socket
 
@@ -22,13 +37,14 @@ def get_public_ip(timeout=2):
     # get public address
     import httplib
 
-    with c=httplib.HTTPConnection("checkip.dyndns.com", timeout=timeout):
-        try:
-            c.request("GET", "/")
-        except socket.gaierror:
-            return "no conn to dynds"
+    c = httplib.HTTPConnection("checkip.dyndns.com", timeout=timeout)
+    try:
+        c.request("GET", "/")
+    except socket.gaierror:
+        return "no conn to dynds"
 
-        htmlbody=c.getresponse().read()
+    htmlbody=c.getresponse().read()
+    c.close()
 
     import re
 
