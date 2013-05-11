@@ -78,9 +78,103 @@ def get_lan_ip():
                 pass
     return ip
 
+
+LcdStateDict = {
+    "init": {
+        "left": None,
+        "right": None,
+    },
+}    
+
+class LcdState():
+    def __init__(self, text, left=None, right=None, up=None, down=None):
+        self.text = text
+        self.left = left
+        self.right = right
+        self.up = up
+        self.down = down
+        if type(self.left) == LcdState:
+            self.left.right = self
+
+    def action(self):
+        # overwrite this function when sublassing
+        return self
+
+    def select_press(self, ref, btn):
+        while(ref(btn)): pass
+        return self.action()
+
+    def left_press(self, ref, btn):
+        if self.left:
+            while(ref(btn)): pass
+            return self.left
+        else:
+            while(ref(btn)): pass
+            return self
+
+    def right_press(self, ref, btn):
+        if self.right:
+            while(ref(btn)): pass
+            return self.right
+        else:
+            while(ref(btn)): pass
+            return self
+
+    def up_press(self):
+        pass
+
+    def down_press(self):
+        pass
+
+class MenuLocalIp(LcdState):
+    def action(self):
+        # get old text
+        text = self.text.split("\n")[0]
+        self.text = text + "\n" + get_lan_ip()
+        return self
+
+
+menu_init = LcdState("init")
+menu_local_ip = MenuLocalIp("lan ip")
+
+menu_local_ip.left = menu_init
+menu_init.right = menu_local_ip
+
+
+
+class LcdMenu(Adafruit_CharLCDPlate):
+
+    def __init__(self, *args, **kwargs):
+
+        if "menu" in kwargs:
+            self.menu = kwargs.pop("menu")
+        else:
+            raise KeyError("menu argument required")
+
+        super(LcdMenu, self).__init__(*args, **kwargs)
+
+
+    def loop(self):
+        self.clear()
+        self.message(self.menu.text)
+        while True:
+            if self.buttonPressed(self.SELECT):
+                self.clear()
+                self.menu = self.menu.select_press(ref=self.buttonPressed, btn=self.SELECT)
+                self.message(self.menu.text)
+            elif self.buttonPressed(self.LEFT):
+                self.clear()
+                self.menu = self.menu.left_press(ref=self.buttonPressed, btn=self.LEFT)
+                self.message(self.menu.text)
+            elif self.buttonPressed(self.RIGHT):
+                self.clear()
+                self.menu = self.menu.right_press(ref=self.buttonPressed, btn=self.RIGHT)
+                self.message(self.menu.text)
+            
+
 # Initialize the LCD plate.  Should auto-detect correct I2C bus.  If not,
 # pass '0' for early 256 MB Model B boards or '1' for all later versions
-lcd = Adafruit_CharLCDPlate()
+lcd = LcdMenu(menu=menu_init)
 
 # Clear display and show greeting, pause 1 sec
 lcd.clear()
@@ -89,3 +183,15 @@ lcd.clear()
 lcd.backlight(lcd.GREEN)
 lcd.message(get_lan_ip()+'\n'+get_public_ip())
 sleep(1)
+
+lcd.loop()
+
+#while True:
+#    try:
+#        lcd.loop()
+#    except KeyboardInterrupt:
+#        break
+#    except Exception, e:
+#        lcd = LcdMenu(menu=menu_init)
+#        print "Exception", e
+
