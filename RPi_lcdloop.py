@@ -79,13 +79,6 @@ def get_lan_ip():
     return ip
 
 
-LcdStateDict = {
-    "init": {
-        "left": None,
-        "right": None,
-    },
-}    
-
 class LcdState():
     def __init__(self, text, left=None, right=None, up=None, down=None):
         self.text = text
@@ -126,19 +119,29 @@ class LcdState():
     def down_press(self):
         pass
 
-class MenuLocalIp(LcdState):
+class MenuLanIp(LcdState):
     def action(self):
         # get old text
         text = self.text.split("\n")[0]
         self.text = text + "\n" + get_lan_ip()
         return self
 
+class MenuPublicIp(LcdState):
+    def action(self):
+        # get old text
+        text = self.text.split("\n")[0]
+        self.text = text + "\n" + get_public_ip()
+        return self
+
 
 menu_init = LcdState("init")
-menu_local_ip = MenuLocalIp("lan ip")
+menu_lan_ip = MenuLanIp("lan ip")
+menu_public_ip = MenuPublicIp("public ip")
 
-menu_local_ip.left = menu_init
-menu_init.right = menu_local_ip
+menu_public_ip.left = menu_lan_ip
+menu_lan_ip.right = menu_public_ip
+menu_lan_ip.left = menu_init
+menu_init.right = menu_lan_ip
 
 
 
