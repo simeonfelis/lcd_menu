@@ -1,0 +1,13 @@
+diff --git a/Adafruit_I2C/Adafruit_I2C.py b/Adafruit_I2C/Adafruit_I2C.py
+index 3423461..6902a9d 100755
+--- a/Adafruit_I2C/Adafruit_I2C.py
++++ b/Adafruit_I2C/Adafruit_I2C.py
+@@ -6,7 +6,7 @@ import smbus
+ # Adafruit_I2C Class
+ # ===========================================================================
+ 
+-class Adafruit_I2C :
++class Adafruit_I2C(object):
+ 
+   @staticmethod
+   def getPiRevision():
