@@ -1,5 +1,9 @@
 import os, socket
+from time import sleep
 from subprocess import Popen, PIPE
+
+VLC_USER = "simeon"
+VLC_PLAYLIST = os.path.join("/", "home", VLC_USER, "playlist.pls")
 
 if os.name != "nt":
     import fcntl
@@ -172,120 +176,62 @@ class MenuPlaylist(LcdState):
     lists = []
     pos = -1
     play = -1
+    ps = None
 
     def __init__(self, *args, **kwargs):
 
         super(MenuPlaylist, self).__init__(*args, **kwargs)
 
         # Try to load list on startup
+        cmd = ["su", "-c", "vlc -I rc %s" % (VLC_PLAYLIST), VLC_USER]
+        self.ps = Popen(cmd, stdout=PIPE, stdin=PIPE, preexec_fn=os.setsid)
+        sleep(3)
+        # dump two info lines
+        self.ps.stdout.readline(); self.ps.stdout.readline()
+        sleep(3)
         self.action()
 
     def down_press(self, ref, btn):
 
-        text = self.text.split("\n")[0]
-
         while(ref(btn)): pass
-        
-        if len(self.lists) > self.pos+1:
-            self.pos += 1
-            self.text = text + "\n" + self.lists[self.pos][0]
+        self.write_vlc_command("next")
+        self.text = "vlc next"
 
         return self
 
     def up_press(self, ref, btn):
-
-        text = self.text.split("\n")[0]
         
         while(ref(btn)): pass
-        
-        if self.pos == -1:
-            return self
-            
-        self.pos -= 1
-        if self.pos == -1:
-            self.text = text
-        else:
-            self.text += "\n" + self.lists[self.pos][0]
-
+        self.write_vlc_command("prev")
+        self.text = "vlc previous"
         return self
+    
+    def read_vlc_result(self):
+        tmp = self.ps.stdout.readline().strip()
+        print "GOT: '%s'" % tmp
+        while tmp.startswith('>'):
+            tmp = tmp.lstrip('>').strip()
+        tmp = tmp.strip()
+        return tmp
+
+    def write_vlc_command(self, command):
+        self.ps.stdin.write("%s\n" % command)
 
     def action(self):
-        # get old text
-        text = self.text.split("\n")[0]
-
-        if self.pos < 0:
-            # no playlist item selected: update
-
-            if self.play >= 0:
-                # when something is playing, stop it
-                import signal
-
-                os.killpg(self.ps.pid, signal.SIGTERM)
-                self.ps.wait()
-                self.play = -1
-
-            import httplib
-
-            c = httplib.HTTPConnection("localhost", timeout=1)
-            try:
-                c.request("GET", "/list/")
-            except socket.error:
-                self.text += "\n" + "server offline?"
-                return self
-            except httplib.CannotSendRequest:
-                self.text += "\n" + "connection error"
-                return self
-            except httplib.HTTPException:
-                self.text += "\n" + "http error"
-                return self
-
-            jsondata=c.getresponse().read()
-            c.close()
-
-            import json
-            try:
-                lists = json.loads(jsondata)
-            except ValueError:
-                self.text += "\n" + "/list/ data err"
-                return self
-            
-            self.lists = []
-            for l in lists:
-                self.lists.append((l["name"], l["url"]))
-            print self.lists
-
-
-            self.text = text + "\n" + "loaded"
-           
+        print "Playlist action"
+        self.write_vlc_command("is_playing")
+        res = self.read_vlc_result()
+        if res == "1":
+            self.text = "select to stop vlc"
+            self.write_vlc_command("stop")
+        elif res == "0":
+            self.text = "select to start vlc"
+            self.write_vlc_command("play")
+            return self
         else:
-            cmd = ["su", "-c", "vlc " + self.lists[self.pos][1], "pi"]
-            # playlist item selected: stop/start
-            if self.play >= 0:
-                # currently playing something, stop and/or change track
+            raise ValueError("unexpected vlc state: '%s'" % str(res))
 
-                print "Killing process"
-                import signal
-
-                os.killpg(self.ps.pid, signal.SIGTERM)
-                self.ps.wait()
-                print "Killed"
-
-                # if different playlist item got selected:
-                if self.pos != self.play:
-                    print "Different item"
-                    self.ps = Popen(cmd, stdout=PIPE, stdin=PIPE) 
-                    self.play = self.pos
-                else:
-                    print "Nothing"
-                    # playing nothing
-                    self.play = -1
-                    
-            else:
-                self.play = self.pos
-                self.ps = Popen(cmd, stdout=PIPE, stdin=PIPE, preexec_fn=os.setsid) 
-            
         return self
-
 
 
 class MenuVolume(LcdState):
