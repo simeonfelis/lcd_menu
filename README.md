@@ -34,6 +34,14 @@ Following packages should be installed:
  * vlc
  * alsa-utils
  * git
+ * python-smbus (on debian)
+ * i2c-tools (on archlinux)
+
+Make sure the corresponding modules are loaded:
+
+    modprobe i2c_bcm2708
+    modprobe i2c-dev
+
 
 Get the Adafruit code, this code:
 
