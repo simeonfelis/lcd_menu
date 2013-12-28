@@ -43,6 +43,11 @@ Make sure the corresponding modules are loaded:
     modprobe i2c-dev
 
 
+On systemd-driven systems (like ArchLinux), you can use the lcd.service file and place it here:
+
+    cp lcd.service /usr/lib/systemd/system/lcd.service
+
+
 Get the Adafruit code, this code:
 
     git clone https://github.com/adafruit/Adafruit-Raspberry-Pi-Python-Code.git
