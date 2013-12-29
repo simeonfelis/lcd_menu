@@ -136,6 +136,14 @@ class LcdState(object):
     def down_press(self, ref, btn):
         return self
 
+class MenuShutdown(LcdState):
+    def action(self):
+        text = self.text.split("\n")[0]
+        self.text = text + "\n" + "shutting down..."
+        cmd = ["shutdown", "-h", "now"]
+        Popen(cmd, stdin=PIPE, stdout=PIPE, preexec_fn=os.setsid)
+        
+
 class MenuLanIp(LcdState):
     """Displays lan IP address when select is pressed"""
 

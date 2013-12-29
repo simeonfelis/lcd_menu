@@ -68,8 +68,9 @@ def run_shit():
     menu_volume = MenuVolume("Volume")
     menu_lan_ip = MenuLanIp("lan ip")
     menu_public_ip = MenuPublicIp("public ip")
+    menu_shutdown = MenuShutdown("shutdown")
     
-    all_items = [menu_init, menu_playlist, menu_volume, menu_lan_ip, menu_public_ip]
+    all_items = [menu_init, menu_playlist, menu_volume, menu_lan_ip, menu_public_ip, menu_shutdown]
     
     for i, m in enumerate(all_items):
          if i < len(all_items)-1:
