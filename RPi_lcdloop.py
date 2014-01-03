@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
-import sys, os
+import sys, os, signal
 import socket
 from time import sleep
 
+from Menu import *
 
 # import Adafruit path
 
@@ -17,11 +18,14 @@ ADAFRUIT_LCD_PLATE = os.path.join(ADAFRUIT_DIR, "Adafruit_CharLCDPlate")
 sys.path.append(ADAFRUIT_DIR)
 sys.path.append(ADAFRUIT_LCD_PLATE)
 
+lcd = None # global for lcd menu to make signal handling easier
 
 from Adafruit_CharLCDPlate import Adafruit_CharLCDPlate
 
 
 class LcdMenu(Adafruit_CharLCDPlate):
+    
+    _system_stoped = False
 
     def __init__(self, *args, **kwargs):
 
@@ -37,88 +41,105 @@ class LcdMenu(Adafruit_CharLCDPlate):
         self.clear()
         self.message(self.menu.text)
         while True:
+            if self._system_stoped:
+                self.menu._system_stoped = True
+                raise KeyboardInterrupt
+            sleep(0.3)
+            update = False
             if self.buttonPressed(self.SELECT):
-                self.clear()
                 self.menu = self.menu.select_press(ref=self.buttonPressed, btn=self.SELECT)
-                self.message(self.menu.text)
+                update = True
             elif self.buttonPressed(self.LEFT):
-                self.clear()
                 self.menu = self.menu.left_press(ref=self.buttonPressed, btn=self.LEFT)
-                self.message(self.menu.text)
+                update = True
             elif self.buttonPressed(self.RIGHT):
-                self.clear()
                 self.menu = self.menu.right_press(ref=self.buttonPressed, btn=self.RIGHT)
-                self.message(self.menu.text)
+                update = True
             elif self.buttonPressed(self.DOWN):
-                self.clear()
                 self.menu = self.menu.down_press(ref=self.buttonPressed, btn=self.DOWN)
-                self.message(self.menu.text)
+                update = True
             elif self.buttonPressed(self.UP):
-                self.clear()
                 self.menu = self.menu.up_press(ref=self.buttonPressed, btn=self.UP)
+                update = True
+            else:
+                if self.menu.update():
+                    update = True
+            if update:
+                self.clear()
                 self.message(self.menu.text)
-            
 
-
-def run_shit():
-
-
-    menu_init = LcdState("init")
-    menu_playlist = MenuPlaylist("playlist")
+def make_menuitems():
+    menu_playlist = MenuPlaylist()
     menu_volume = MenuVolume("Volume")
     menu_lan_ip = MenuLanIp("lan ip")
     menu_public_ip = MenuPublicIp("public ip")
-    menu_shutdown = MenuShutdown("shutdown")
+    menu_shutdown = MenuShutdown()
+    menu_reboot = MenuReboot()
     
-    all_items = [menu_init, menu_playlist, menu_volume, menu_lan_ip, menu_public_ip, menu_shutdown]
+    #all_items = [menu_init, menu_playlist, menu_volume, menu_lan_ip, menu_public_ip, menu_shutdown, menu_reboot]
+    all_items = [menu_playlist, menu_volume, menu_lan_ip, menu_public_ip, menu_shutdown, menu_reboot]
+    return all_items
+
+def run_shit(menuitems):
     
-    for i, m in enumerate(all_items):
-         if i < len(all_items)-1:
-             all_items[i].right = all_items[i+1]
+    global lcd
+
+    for i, m in enumerate(menuitems):
+         if i < len(menuitems)-1:
+             menuitems[i].right = menuitems[i+1]
          if i:
-             all_items[i].left = all_items[i-1]
+             menuitems[i].left = menuitems[i-1]
 
 
     # Initialize the LCD plate.  Should auto-detect correct I2C bus.  If not,
     # pass '0' for early 256 MB Model B boards or '1' for all later versions
-    lcd = LcdMenu(menu=menu_init)
+    
+    #lcd = LcdMenu(menu=menu_init)
+    lcd = LcdMenu(menu=menuitems[0])
     
     # Clear display and show greeting, pause 1 sec
     lcd.clear()
     
-    
     lcd.backlight(lcd.GREEN)
-    lcd.message(get_lan_ip()+'\n'+get_public_ip())
-    sleep(1)
-
 
     lcd.loop()
 
+def onShutdown(signum, stack):
+    print "GOT SHUTDOWN REQUEST"
+    global lcd
+    lcd.backlight(lcd.BLUE)
+    lcd.clear()
+    lcd.message("LCD MENU STOPED")
+    lcd._system_stoped = True
+    
 if __name__ == "__main__":
 
-    from Menu import *
+    signal.signal(signal.SIGTERM, onShutdown)
+    signal.signal(signal.SIGUSR1, onShutdown)
 
+    menuitems = make_menuitems()
 
     if "daemon" in sys.argv:
         while True:
             try:
-                run_shit()
+                run_shit(menuitems)
             except KeyboardInterrupt:
                 break
             except Exception, e:
-                lcd = Adafruit_CharLCDPlate()
-                lcd.clear()
-                lcd.backlight(lcd.RED)
+                lcdFallback = Adafruit_CharLCDPlate()
+                lcdFallback.clear()
+                lcdFallback.backlight(lcdFallback.RED)
 
                 mes = repr(e)
                 if len(mes)>16:
                     mes = mes[:16] + "\n" + mes[16:]
 
-                lcd.message(mes)
+                lcdFallback.message(mes)
 
                 print "Exception", e
                 sleep(10)
+                del lcdFallback
 
     else:
-       run_shit()
-    
+       run_shit(menuitems)
+

@@ -96,9 +96,14 @@ class LcdState(object):
         This makes sure every item is connected with each other.
 
     """
+    
+    _system_stoped = False
+    
+    text = "1st line not set\n2nd line not set"
 
-    def __init__(self, text, left=None, right=None, up=None, down=None):
-        self.text = text
+    def __init__(self, text=None, left=None, right=None, up=None, down=None):
+        if text != None:
+            self.text = text
         self.left = left
         self.right = right
         self.up = up
@@ -135,13 +140,36 @@ class LcdState(object):
 
     def down_press(self, ref, btn):
         return self
+    
+    def update(self):
+        """
+        Make this return False to reduce flickering"
+        """
+        return True
+
+class MenuReboot(LcdState):
+    text = "reboot RPi"
+    def action(self):
+        text = self.text.split("\n")[0]
+        self.text = text + "\n" + "rebooting..."
+        cmd = ["reboot"]
+        Popen(cmd)
+        return self
+    
+    def update(self):
+        return False
 
 class MenuShutdown(LcdState):
+    text = "shutdown RPi"
     def action(self):
         text = self.text.split("\n")[0]
         self.text = text + "\n" + "shutting down..."
         cmd = ["shutdown", "-h", "now"]
-        Popen(cmd, stdin=PIPE, stdout=PIPE, preexec_fn=os.setsid)
+        Popen(cmd)
+        return self
+    
+    def update(self):
+        return False
         
 
 class MenuLanIp(LcdState):
@@ -152,6 +180,9 @@ class MenuLanIp(LcdState):
         text = self.text.split("\n")[0]
         self.text = text + "\n" + get_lan_ip()
         return self
+    
+    def update(self):
+        return False
 
 class MenuPublicIp(LcdState):
     """Displays public IP address when select is pressed"""
@@ -161,43 +192,39 @@ class MenuPublicIp(LcdState):
         text = self.text.split("\n")[0]
         self.text = text + "\n" + get_public_ip()
         return self
+    
+    def update(self):
+        return False
 
 
 class MenuPlaylist(LcdState):
-    """Load a list of URLs for internet radio streams to play. Assumes
-    such list is provided on http://localhost/list, and the return value
-    is a json encoded list in the format::
-
-        [
-          {"url": "http://stream1.example.com", "name": "Stream name"},
-          {"url": "http://stream2.example.com", "name": "Another stream name"},
-        ]
-
-    When select is pressed, it fetches the list from Server. Then a stream can
-    be chosen by pressing up/down. When select is pressed, it plays the stream.
-    When select is pressed again, the stream will be stoped.
-
-    VLC is used as player.
-
+    """Controls a VLC instance over its rc interface. By default, VLC opens
+    a playlist located in VLC_PLAYLIST as user VLC_USER, because VLC will
+    not run as root.
+    
+    Playlist items can be selected with up/down buttons. Select will start/stop VLC.
     """
+
+    text = "Music player"
 
     lists = []
     pos = -1
     play = -1
     ps = None
 
+    _update_counter = 0
+    _shift_counter = 0
+
+    
+
     def __init__(self, *args, **kwargs):
 
         super(MenuPlaylist, self).__init__(*args, **kwargs)
-
-        # Try to load list on startup
-        cmd = ["su", "-c", "vlc -I rc %s" % (VLC_PLAYLIST), VLC_USER]
-        self.ps = Popen(cmd, stdout=PIPE, stdin=PIPE, preexec_fn=os.setsid)
-        sleep(3)
-        # dump two info lines
-        self.ps.stdout.readline(); self.ps.stdout.readline()
-        sleep(3)
-        self.action()
+        
+        self.start_vlc()
+        
+        self.settext()
+        
 
     def down_press(self, ref, btn):
 
@@ -213,33 +240,135 @@ class MenuPlaylist(LcdState):
         self.write_vlc_command("prev")
         self.text = "vlc previous"
         return self
+
+    def get_title(self):
+        if self.is_playing():
+            self.write_vlc_command("get_title")
+            firstline = self.read_vlc_result().replace('\n', "_")
+        else:
+            firstline = "Music player"
+        
+        return firstline
+        
+    def start_vlc(self):
+        # Kill possibly existing vlc instances
+        cmd = ["pkill", "vlc"]
+        p = Popen(cmd)
+        p.wait()
+
+        # Try to load list on startup
+        cmd = ["su", "-c", "vlc -I rc --no-playlist-autostart --one-instance --no-playlist-enqueue %s" % (VLC_PLAYLIST), VLC_USER]
+        self.ps = Popen(cmd, stdout=PIPE, stdin=PIPE, preexec_fn=os.setsid)
+        sleep(3)
+        # dump two info lines
+        self.ps.stdout.readline(); self.ps.stdout.readline()
+        
+
+    def settext(self, text=None):
+        # scroll title
+        title = self.get_title()
+        if len(title) > 16:
+            if self._shift_counter < len(title)-16:
+                self._shift_counter += 1
+                title = title[self._shift_counter:self._shift_counter+16]
+            elif self._shift_counter < len(title):
+                # fill rest with spaces to fully scroll complete title
+                self._shift_counter += 1
+                title = title[self._shift_counter:]
+                # actually, spaces are not needed for that effect
+            else:
+                self._shift_counter = 0
+        firstline = title
+
+        if text != None:
+            self.text = firstline + "\n" + text
+        else:
+            if self.is_playing():
+                duration = self.get_time()
+                duration_back = duration
+                try:
+                    duration = int(duration)
+                    minutes = duration/60
+                    seconds = duration%60
+                    duration = "%i:%02i" % (minutes, seconds)
+                except Exception, e:
+                    print "Exception while calculating elapsed playing time: %s" % str(e)
+                    duration = duration_back
+                spaces = 16 - len("playing") - len(duration)
+                secondline = "playing" + " "*spaces + duration
+            else:
+                secondline = "stoped"
+            self.text = firstline + "\n" + secondline
+            
+            
+    def get_time(self):
+        self.write_vlc_command("get_time")
+        duration = self.read_vlc_result()
+        return duration
     
     def read_vlc_result(self):
-        tmp = self.ps.stdout.readline().strip()
-        print "GOT: '%s'" % tmp
+        try:
+            tmp = self.ps.stdout.readline().strip()
+        except IOError:
+            if self._system_stoped:
+                raise KeyboardInterrupt()
+            print("VLC was shut down?")
+            self.start_vlc()
+            tmp = ""
+        print("GOT: %s" % tmp)
         while tmp.startswith('>'):
             tmp = tmp.lstrip('>').strip()
         tmp = tmp.strip()
         return tmp
 
     def write_vlc_command(self, command):
-        self.ps.stdin.write("%s\n" % command)
+        try:
+            self.ps.stdin.write("%s\n" % command)
+        except IOError:
+            if self._system_stoped:
+                raise KeyboardInterrupt
+            print("VLC was shut down?")
+            self.start_vlc()
+            raise ValueError("VLC shutdown?")
 
-    def action(self):
-        print "Playlist action"
+    def is_playing(self):
         self.write_vlc_command("is_playing")
         res = self.read_vlc_result()
+
         if res == "1":
-            self.text = "select to stop vlc"
-            self.write_vlc_command("stop")
+            return True
         elif res == "0":
-            self.text = "select to start vlc"
-            self.write_vlc_command("play")
-            return self
+            return False
         else:
             raise ValueError("unexpected vlc state: '%s'" % str(res))
 
+    def action(self):
+        print "Playlist action"
+        if self.is_playing():
+            self.write_vlc_command("stop")
+            sleep(.5)
+            self.settext("stoped")
+        else:
+            self.write_vlc_command("play")
+            sleep(.5)
+            self.settext("playing")
+
         return self
+    
+    def update(self):
+        if not self.is_playing():
+            return False
+        
+        self._update_counter += 1
+        
+        if self._update_counter == 1:
+            self._update_counter = 0
+            
+            self.settext()
+            
+            return True
+
+        return False 
 
 
 class MenuVolume(LcdState):
