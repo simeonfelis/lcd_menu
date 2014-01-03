@@ -104,7 +104,11 @@ def run_shit(menuitems, args):
     # Clear display and show greeting, pause 1 sec
     lcd.clear()
     
+    lcd.backlight(lcd.BLUE)
+    lcd.message("     HELLO      ")
+    sleep(1)
     lcd.backlight(lcd.GREEN)
+    lcd.clear()
 
     lcd.loop()
 
