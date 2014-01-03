@@ -3,6 +3,8 @@ lcd_menu
 
 A tiny lcd info and menu for the 16x2 lcd display for raspberry from adafruit.
 
+Find pictures and videos in the wiki: https://github.com/simeonfelis/lcd_menu/wiki
+
 It has capabilities to play internet radio streams using vlc. Therefor it 
 read the playlist in /home/pi/playlist.m3u (by default)
 
