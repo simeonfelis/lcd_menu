@@ -126,7 +126,7 @@ if __name__ == "__main__":
             description="Program to provide little Menu for Adafruit's LCD menu"
     )
     parser.epilog = """\
-Example: RPi_lcdloop --user pi --playlist /path/to/playlist.m3u daemon
+Example: RPi_lcdloop --user pi --playlist /path/to/playlist.m3u --daemon
 """
 
     parser.prog = os.path.basename(sys.argv[0])

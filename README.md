@@ -116,23 +116,34 @@ The location of the playlist.m3u can be provided with ``-p`` flag to RPi_lcdloop
 
 See also
 
-    RPi_lcdloop.py -h
+    # RPi_lcdloop.py -h
+    usage: RPi_lcdloop.py [-h] [-u USER] [-p PLAYLIST] [-d]
 
-For the command line help.
+    Program to provide little Menu for Adafruit's LCD menu
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -u USER, --user USER  user VLC should be run as. Default: pi
+      -p PLAYLIST, --playlist PLAYLIST
+                            Playlist for VLC. Default: /home/pi/playlist.m3u
+      -d, --daemon          continue after crashes
+
+     Example: RPi_lcdloop --user pi --playlist /path/to/playlist.m3u -d
+
 
 
 Instanciate the menu by calling
 
-    sudo python RPi_lcdloop.py daemon
+    sudo python RPi_lcdloop.py
 
 To start the menu during boot put following in `/etc/rc.local` (or use the systemd service file):
 
     PATH=$PATH:/usr/bin:/usr/local/bin:/bin:/usr/sbin
     export PATH
-    (python /path/to/RPi_lcdloop.py daemon) &
+    (python /path/to/RPi_lcdloop.py --daemon) &
 
 
-To start the menu manually start it without the `daemon` parameter.
+To start the menu manually start it without the `--daemon` parameter.
 
 I made a smbd share for the playlist and edit with VLC on my normal PC.
 
