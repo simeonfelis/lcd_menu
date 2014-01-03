@@ -2,7 +2,7 @@ import os, socket
 from time import sleep
 from subprocess import Popen, PIPE
 
-VLC_USER = "simeon"
+VLC_USER = "pi"
 VLC_PLAYLIST = os.path.join("/", "home", VLC_USER, "playlist.pls")
 
 if os.name != "nt":
@@ -218,6 +218,13 @@ class MenuPlaylist(LcdState):
     
 
     def __init__(self, *args, **kwargs):
+        
+        if "user" in kwargs.keys():
+            global VLC_USER
+            VLC_USER = kwargs.pop("user")
+        if "playlist" in kwargs.keys():
+            global VLC_PLAYLIST
+            VLC_PLAYLIST = kwargs.pop("playlist")
 
         super(MenuPlaylist, self).__init__(*args, **kwargs)
         
@@ -257,27 +264,40 @@ class MenuPlaylist(LcdState):
         p.wait()
 
         # Try to load list on startup
-        cmd = ["su", "-c", "vlc -I rc --no-playlist-autostart --one-instance --no-playlist-enqueue %s" % (VLC_PLAYLIST), VLC_USER]
+        cmd = ["su", "-s", "/bin/bash", "-c", "vlc -I rc --no-playlist-autostart --one-instance --no-playlist-enqueue %s" % (VLC_PLAYLIST), VLC_USER]
         self.ps = Popen(cmd, stdout=PIPE, stdin=PIPE, preexec_fn=os.setsid)
         sleep(3)
         # dump two info lines
         self.ps.stdout.readline(); self.ps.stdout.readline()
+        
+        # looks like a bug with the command line parameters I have chosen. I need to write two times `play` after vlc started
+        # to make VLC start playing. After VLC played once, it is working normally again.
+        self.write_vlc_command("play")
+        sleep(0.5)
         
 
     def settext(self, text=None):
         # scroll title
         title = self.get_title()
         if len(title) > 16:
-            if self._shift_counter < len(title)-16:
+            if self._shift_counter < 0:
+                # fill the beginning with spaces
+                self._shift_counter += 1
+                spaces = -1 * self._shift_counter
+                title = " "*spaces + title[0:16-spaces]
+            elif self._shift_counter < len(title)-16:
                 self._shift_counter += 1
                 title = title[self._shift_counter:self._shift_counter+16]
             elif self._shift_counter < len(title):
                 # fill rest with spaces to fully scroll complete title
                 self._shift_counter += 1
-                title = title[self._shift_counter:]
+                spaces = 16 - len(title) + self._shift_counter
+                title = title[self._shift_counter:] + " "*spaces
                 # actually, spaces are not needed for that effect
             else:
-                self._shift_counter = 0
+                # next time, start text from the very right
+                self._shift_counter = -16
+                title = " "*16
         firstline = title
 
         if text != None:
@@ -315,7 +335,7 @@ class MenuPlaylist(LcdState):
             print("VLC was shut down?")
             self.start_vlc()
             tmp = ""
-        print("GOT: %s" % tmp)
+        #print("GOT: %s" % tmp)
         while tmp.startswith('>'):
             tmp = tmp.lstrip('>').strip()
         tmp = tmp.strip()
@@ -347,11 +367,17 @@ class MenuPlaylist(LcdState):
         if self.is_playing():
             self.write_vlc_command("stop")
             sleep(.5)
-            self.settext("stoped")
+            if self.is_playing():
+                self.settext("could not stop")
+            else:
+                self.settext("stoped")
         else:
             self.write_vlc_command("play")
             sleep(.5)
-            self.settext("playing")
+            if self.is_playing():
+                self.settext("playing")
+            else:
+                self.settext("could not start")
 
         return self
     
@@ -361,7 +387,7 @@ class MenuPlaylist(LcdState):
         
         self._update_counter += 1
         
-        if self._update_counter == 1:
+        if self._update_counter == 2:
             self._update_counter = 0
             
             self.settext()

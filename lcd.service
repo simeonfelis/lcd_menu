@@ -4,7 +4,7 @@ Description=LCD menu from Adafruit
 [Service]
 Type=simple
 PIDFile=/var/run/lcd.pid
-ExecStart=/usr/bin/python2 /root/lcd_menu/RPi_lcdloop.py daemon
+ExecStart=/usr/bin/python2 /root/lcd_menu/RPi_lcdloop.py -u pi -p /home/pi/playlist.m3u --daemon
 
 [Install]
 WantedBy=multi-user.target

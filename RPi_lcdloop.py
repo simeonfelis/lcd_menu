@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, signal
+import sys, os, signal, argparse
 import socket
 from time import sleep
 
@@ -44,32 +44,36 @@ class LcdMenu(Adafruit_CharLCDPlate):
             if self._system_stoped:
                 self.menu._system_stoped = True
                 raise KeyboardInterrupt
-            sleep(0.3)
+            sleep(0.2)
             update = False
+            clear = False
             if self.buttonPressed(self.SELECT):
                 self.menu = self.menu.select_press(ref=self.buttonPressed, btn=self.SELECT)
-                update = True
+                clear = True
             elif self.buttonPressed(self.LEFT):
                 self.menu = self.menu.left_press(ref=self.buttonPressed, btn=self.LEFT)
-                update = True
+                clear = True
             elif self.buttonPressed(self.RIGHT):
                 self.menu = self.menu.right_press(ref=self.buttonPressed, btn=self.RIGHT)
-                update = True
+                clear = True
             elif self.buttonPressed(self.DOWN):
                 self.menu = self.menu.down_press(ref=self.buttonPressed, btn=self.DOWN)
-                update = True
+                clear = True
             elif self.buttonPressed(self.UP):
                 self.menu = self.menu.up_press(ref=self.buttonPressed, btn=self.UP)
-                update = True
+                clear = True
             else:
                 if self.menu.update():
                     update = True
-            if update:
+            if clear:
                 self.clear()
                 self.message(self.menu.text)
+            if update:
+                self.home()
+                self.message(self.menu.text)
 
-def make_menuitems():
-    menu_playlist = MenuPlaylist()
+def make_menuitems(args):
+    menu_playlist = MenuPlaylist(user=args.user, playlist=args.playlist)
     menu_volume = MenuVolume("Volume")
     menu_lan_ip = MenuLanIp("lan ip")
     menu_public_ip = MenuPublicIp("public ip")
@@ -80,7 +84,7 @@ def make_menuitems():
     all_items = [menu_playlist, menu_volume, menu_lan_ip, menu_public_ip, menu_shutdown, menu_reboot]
     return all_items
 
-def run_shit(menuitems):
+def run_shit(menuitems, args):
     
     global lcd
 
@@ -114,15 +118,39 @@ def onShutdown(signum, stack):
     
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(
+            description="Program to provide little Menu for Adafruit's LCD menu"
+    )
+    parser.epilog = """\
+Example: RPi_lcdloop --user pi --playlist /path/to/playlist.m3u daemon
+"""
+
+    parser.prog = os.path.basename(sys.argv[0])
+    parser.add_argument("-u", "--user",
+            default="pi",
+            help="user VLC should be run as. Default: pi"
+    )
+    parser.add_argument("-p", "--playlist",
+            default="/home/pi/playlist.m3u",
+            help="Playlist for VLC. Default: /home/pi/playlist.m3u"
+    )
+    parser.add_argument("-d", "--daemon",
+            action="store_true",
+            default=False,
+            help="continue after crashes"
+    )
+
+    args = parser.parse_args()
+
     signal.signal(signal.SIGTERM, onShutdown)
     signal.signal(signal.SIGUSR1, onShutdown)
 
-    menuitems = make_menuitems()
-
-    if "daemon" in sys.argv:
+    menuitems = make_menuitems(args)
+    
+    if args.daemon:
         while True:
             try:
-                run_shit(menuitems)
+                run_shit(menuitems, args)
             except KeyboardInterrupt:
                 break
             except Exception, e:
@@ -141,5 +169,5 @@ if __name__ == "__main__":
                 del lcdFallback
 
     else:
-       run_shit(menuitems)
+       run_shit(menuitems, args)
 

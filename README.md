@@ -4,12 +4,11 @@ lcd_menu
 A tiny lcd info and menu for the 16x2 lcd display for raspberry from adafruit.
 
 It has capabilities to play internet radio streams using vlc. Therefor it 
-read the playlist in /home/simeon/playlist.pls.
+read the playlist in /home/pi/playlist.m3u (by default)
 
 The volume can be controlled, to.
 
 You can see local lan IP address and the public ip address.
-
 
 This LCD menu structure is kept simple, stupid and dump. It is not really good code,
 although it should just work and can be extended without reading too much. Assume the
@@ -83,6 +82,10 @@ Start the lcd-menu:
     cd lcd_menu
     sudo python RPi_lcdloop.py
 
+Make sure the user pi is added to group audio!
+
+    usermod -a -G audio pi
+
 
 
 Details
@@ -90,21 +93,30 @@ Details
 
 This is how a playlist can look like:
 
-    cat playlist.plx
-    [playlist]
-    numberofentries=2
-    File1=http://mp2.somafm.com:9016
-    Title1=SomaFM: Secret Agent (#1 128k mp3): The soundtrack for your stylish, mysterious, dangerous life. For Spies and PIs too!
-    Length1=-1
-    File2=http://ice.somafm.com/secretagent
-    Title2=SomaFM: Secret Agent (Firewall-friendly 128k mp3) The soundtrack for your stylish, mysterious, dangerous life. For Spies and PIs too!
-    Length2=-1
-    Version=2
+    cat playlist.m3u
+    #EXTM3U
+    #EXTINF:0,Secret Agent: The soundtrack for your stylish - Secret Agent: The soundtrack for your stylish, mysterious, dangerous life. For Spys and P.I.'s too! [SomaFM]
+    http://mp2.somafm.com:9016
+    #EXTINF:0,Charivari Regensburg
+    #EXTVLCOPT:network-caching=1000
+    http://edge.live.mp3.mdn.newmedia.nacamar.net/ps-chari/livestream.mp3
+    #EXTINF:0,Bayern 2 Sued
+    #EXTVLCOPT:network-caching=1000
+    http://br-mp3-bayern2sued-m.akacast.akamaistream.net/7/731/256282/v1/gnl.akacast.akamaistream.net/br_mp3_bayern2sued_m
 
-The location of the playlist.pls is hardcoded in the Menu.py file. Modify it accordingly.
 
-VLC must not be run as root. I use the `su` command to switch the user for VLC. Change the user in Menu.py.
-Furthermore the `vlc -I rc` option is used to control VLC.
+Playlist and user
+-----------------
+
+VLC must not be run as root. I use the `su` command to switch the user for VLC. Change the user with the ``-u`` flag on RPi_lcdloop.py
+
+The location of the playlist.m3u can be provided with ``-p`` flag to RPi_lcdloop.py. Modify it accordingly in your systemd service file.
+
+See also
+
+    RPi_lcdloop.py -h
+
+For the command line help.
 
 
 Instanciate the menu by calling
@@ -120,4 +132,5 @@ To start the menu during boot put following in `/etc/rc.local` (or use the syste
 
 To start the menu manually start it without the `daemon` parameter.
 
+I made a smbd share for the playlist and edit with VLC on my normal PC.
 
